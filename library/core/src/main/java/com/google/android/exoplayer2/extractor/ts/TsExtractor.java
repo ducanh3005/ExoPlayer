@@ -43,7 +43,9 @@ import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Extracts data from the MPEG-2 TS container format.
@@ -125,16 +127,22 @@ public final class TsExtractor implements Extractor {
   private TsPayloadReader id3Reader;
   private int bytesSinceLastSync;
 
+  private Set<Integer> mWhiteListPIDs = new HashSet<>();
+
   public TsExtractor() {
-    this(0);
+    this(false);
+  }
+
+  public TsExtractor(boolean singleTimestampOffsetOnly) {
+    this(0, singleTimestampOffsetOnly);
   }
 
   /**
    * @param defaultTsPayloadReaderFlags A combination of {@link DefaultTsPayloadReaderFactory}
    *     {@code FLAG_*} values that control the behavior of the payload readers.
    */
-  public TsExtractor(@Flags int defaultTsPayloadReaderFlags) {
-    this(MODE_SINGLE_PMT, defaultTsPayloadReaderFlags);
+  public TsExtractor(@Flags int defaultTsPayloadReaderFlags, boolean singleTimestampOffsetOnly) {
+    this(MODE_SINGLE_PMT, defaultTsPayloadReaderFlags, singleTimestampOffsetOnly);
   }
 
   /**
@@ -143,8 +151,8 @@ public final class TsExtractor implements Extractor {
    * @param defaultTsPayloadReaderFlags A combination of {@link DefaultTsPayloadReaderFactory}
    *     {@code FLAG_*} values that control the behavior of the payload readers.
    */
-  public TsExtractor(@Mode int mode, @Flags int defaultTsPayloadReaderFlags) {
-    this(mode, new TimestampAdjuster(0),
+  public TsExtractor(@Mode int mode, @Flags int defaultTsPayloadReaderFlags, boolean singleTimestampOffsetOnly) {
+    this(mode, new TimestampAdjuster(0, singleTimestampOffsetOnly),
         new DefaultTsPayloadReaderFactory(defaultTsPayloadReaderFlags));
   }
 
@@ -170,6 +178,18 @@ public final class TsExtractor implements Extractor {
     tsPayloadReaders = new SparseArray<>();
     continuityCounters = new SparseIntArray();
     resetPayloadReaders();
+  }
+
+  public void addWhiteListPID(int pid) {
+    mWhiteListPIDs.add(pid);
+  }
+
+  public void clearWhiteListPIDs() {
+    mWhiteListPIDs.clear();
+  }
+
+  public void removeWhiteListPID(int pid) {
+    mWhiteListPIDs.remove(pid);
   }
 
   // Extractor implementation.
@@ -458,6 +478,10 @@ public final class TsExtractor implements Extractor {
           streamType = esInfo.streamType;
         }
         remainingEntriesLength -= esInfoLength + 5;
+
+        // Nuvyyo: Filter unwanted PIDs.
+        if( mWhiteListPIDs.size() > 0 && !mWhiteListPIDs.contains(elementaryPid) )
+          continue;
 
         int trackId = mode == MODE_HLS ? streamType : elementaryPid;
         if (trackIds.get(trackId)) {

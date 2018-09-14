@@ -79,8 +79,15 @@ public final class DefaultExtractorsFactory implements ExtractorsFactory {
   private @TsExtractor.Mode int tsMode;
   private @DefaultTsPayloadReaderFactory.Flags int tsFlags;
 
+  private boolean mSingleTimestampOffsetOnly;
+
   public DefaultExtractorsFactory() {
     tsMode = TsExtractor.MODE_SINGLE_PMT;
+  }
+
+  public synchronized DefaultExtractorsFactory setSingleTimestampOffsetOnly(boolean singleTimestampOffsetOnly) {
+    mSingleTimestampOffsetOnly = singleTimestampOffsetOnly;
+    return this;
   }
 
   /**
@@ -168,7 +175,7 @@ public final class DefaultExtractorsFactory implements ExtractorsFactory {
     extractors[3] = new Mp3Extractor(mp3Flags);
     extractors[4] = new AdtsExtractor();
     extractors[5] = new Ac3Extractor();
-    extractors[6] = new TsExtractor(tsMode, tsFlags);
+    extractors[6] = new TsExtractor(tsMode, tsFlags, mSingleTimestampOffsetOnly);
     extractors[7] = new FlvExtractor();
     extractors[8] = new OggExtractor();
     extractors[9] = new PsExtractor();
