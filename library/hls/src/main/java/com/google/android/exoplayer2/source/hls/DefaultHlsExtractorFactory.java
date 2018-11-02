@@ -102,7 +102,7 @@ public final class DefaultHlsExtractorFactory implements HlsExtractorFactory {
         }
       }
       extractor = new TsExtractor(TsExtractor.MODE_HLS, timestampAdjuster,
-          new DefaultTsPayloadReaderFactory(esReaderFactoryFlags, muxedCaptionFormats));
+          new DefaultTsPayloadReaderFactory(esReaderFactoryFlags, muxedCaptionFormats), false);
     }
     return Pair.create(extractor, isPackedAudioExtractor);
   }

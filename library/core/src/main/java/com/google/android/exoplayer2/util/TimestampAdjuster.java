@@ -43,6 +43,10 @@ public final class TimestampAdjuster {
 
   private boolean mSingleOffsetOnly = false;
 
+  public TimestampAdjuster(long firstSampleTimestampUs) {
+    this(firstSampleTimestampUs, false);
+  }
+
   /**
    * @param firstSampleTimestampUs See {@link #setFirstSampleTimestampUs(long)}.
    */

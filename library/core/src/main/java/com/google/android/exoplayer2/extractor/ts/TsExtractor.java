@@ -127,6 +127,7 @@ public final class TsExtractor implements Extractor {
   private TsPayloadReader id3Reader;
   private int bytesSinceLastSync;
 
+  private boolean mSingleTimestampOffsetOnly;
   private Set<Integer> mWhiteListPIDs = new HashSet<>();
 
   public TsExtractor() {
@@ -153,7 +154,7 @@ public final class TsExtractor implements Extractor {
    */
   public TsExtractor(@Mode int mode, @Flags int defaultTsPayloadReaderFlags, boolean singleTimestampOffsetOnly) {
     this(mode, new TimestampAdjuster(0, singleTimestampOffsetOnly),
-        new DefaultTsPayloadReaderFactory(defaultTsPayloadReaderFlags));
+        new DefaultTsPayloadReaderFactory(defaultTsPayloadReaderFlags), singleTimestampOffsetOnly);
   }
 
 
@@ -164,7 +165,8 @@ public final class TsExtractor implements Extractor {
    * @param payloadReaderFactory Factory for injecting a custom set of payload readers.
    */
   public TsExtractor(@Mode int mode, TimestampAdjuster timestampAdjuster,
-      TsPayloadReader.Factory payloadReaderFactory) {
+      TsPayloadReader.Factory payloadReaderFactory, boolean singleTimestampOffsetOnly) {
+    mSingleTimestampOffsetOnly = singleTimestampOffsetOnly;
     this.payloadReaderFactory = Assertions.checkNotNull(payloadReaderFactory);
     this.mode = mode;
     if (mode == MODE_SINGLE_PMT || mode == MODE_HLS) {
@@ -409,11 +411,18 @@ public final class TsExtractor implements Extractor {
     private final SparseIntArray trackIdToPidScratch;
     private final int pid;
 
+    private boolean mSingleTimestampOffsetOnly;
+
     public PmtReader(int pid) {
+      this(pid, false);
+    }
+
+    public PmtReader(int pid, boolean singleTimestampOffsetOnly) {
       pmtScratch = new ParsableBitArray(new byte[5]);
       trackIdToReaderScratch = new SparseArray<>();
       trackIdToPidScratch = new SparseIntArray();
       this.pid = pid;
+      mSingleTimestampOffsetOnly = singleTimestampOffsetOnly;
     }
 
     @Override
@@ -435,7 +444,7 @@ public final class TsExtractor implements Extractor {
         timestampAdjuster = timestampAdjusters.get(0);
       } else {
         timestampAdjuster = new TimestampAdjuster(
-            timestampAdjusters.get(0).getFirstSampleTimestampUs());
+            timestampAdjusters.get(0).getFirstSampleTimestampUs(), mSingleTimestampOffsetOnly);
         timestampAdjusters.add(timestampAdjuster);
       }
 
