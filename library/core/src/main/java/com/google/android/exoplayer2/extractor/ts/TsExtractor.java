@@ -43,7 +43,9 @@ import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Extracts data from the MPEG-2 TS container format.
@@ -124,16 +126,23 @@ public final class TsExtractor implements Extractor {
   private int bytesSinceLastSync;
   private int pcrPid;
 
+  private Set<Integer> whiteListPIDs = new HashSet<>();
+  private boolean waitForFirstSampleTimestamp;
+
   public TsExtractor() {
-    this(0);
+    this(false);
+  }
+
+  public TsExtractor(boolean waitForFirstSampleTimestamp) {
+    this(0, waitForFirstSampleTimestamp);
   }
 
   /**
    * @param defaultTsPayloadReaderFlags A combination of {@link DefaultTsPayloadReaderFactory}
    *     {@code FLAG_*} values that control the behavior of the payload readers.
    */
-  public TsExtractor(@Flags int defaultTsPayloadReaderFlags) {
-    this(MODE_SINGLE_PMT, defaultTsPayloadReaderFlags);
+  public TsExtractor(@Flags int defaultTsPayloadReaderFlags, boolean waitForFirstSampleTimestamp) {
+    this(MODE_SINGLE_PMT, defaultTsPayloadReaderFlags, waitForFirstSampleTimestamp);
   }
 
   /**
@@ -142,11 +151,13 @@ public final class TsExtractor implements Extractor {
    * @param defaultTsPayloadReaderFlags A combination of {@link DefaultTsPayloadReaderFactory}
    *     {@code FLAG_*} values that control the behavior of the payload readers.
    */
-  public TsExtractor(@Mode int mode, @Flags int defaultTsPayloadReaderFlags) {
+  public TsExtractor(@Mode int mode, @Flags int defaultTsPayloadReaderFlags, boolean waitForFirstSampleTimestamp) {
     this(
         mode,
-        new TimestampAdjuster(0),
-        new DefaultTsPayloadReaderFactory(defaultTsPayloadReaderFlags));
+        new TimestampAdjuster(0, waitForFirstSampleTimestamp),
+        new DefaultTsPayloadReaderFactory(defaultTsPayloadReaderFlags),
+        waitForFirstSampleTimestamp
+    );
   }
 
   /**
@@ -158,9 +169,11 @@ public final class TsExtractor implements Extractor {
   public TsExtractor(
       @Mode int mode,
       TimestampAdjuster timestampAdjuster,
-      TsPayloadReader.Factory payloadReaderFactory) {
+      TsPayloadReader.Factory payloadReaderFactory,
+      boolean waitForFirstSampleTimestamp) {
     this.payloadReaderFactory = Assertions.checkNotNull(payloadReaderFactory);
     this.mode = mode;
+    this.waitForFirstSampleTimestamp = waitForFirstSampleTimestamp;
     if (mode == MODE_SINGLE_PMT || mode == MODE_HLS) {
       timestampAdjusters = Collections.singletonList(timestampAdjuster);
     } else {
@@ -175,6 +188,18 @@ public final class TsExtractor implements Extractor {
     durationReader = new TsDurationReader();
     pcrPid = -1;
     resetPayloadReaders();
+  }
+
+  public void addWhiteListPID(int pid) {
+    whiteListPIDs.add(pid);
+  }
+
+  public void clearWhiteListPIDs() {
+    whiteListPIDs.clear();
+  }
+
+  public void removeWhiteListPID(int pid) {
+    whiteListPIDs.remove(pid);
   }
 
   // Extractor implementation.
@@ -489,11 +514,18 @@ public final class TsExtractor implements Extractor {
     private final SparseIntArray trackIdToPidScratch;
     private final int pid;
 
+    private boolean waitForFirstSampleTimestamp;
+
     public PmtReader(int pid) {
+        this(pid, false);
+    }
+
+    public PmtReader(int pid, boolean waitForFirstSampleTimestamp) {
       pmtScratch = new ParsableBitArray(new byte[5]);
       trackIdToReaderScratch = new SparseArray<>();
       trackIdToPidScratch = new SparseIntArray();
       this.pid = pid;
+      this.waitForFirstSampleTimestamp = waitForFirstSampleTimestamp;
     }
 
     @Override
@@ -515,7 +547,7 @@ public final class TsExtractor implements Extractor {
         timestampAdjuster = timestampAdjusters.get(0);
       } else {
         timestampAdjuster = new TimestampAdjuster(
-            timestampAdjusters.get(0).getFirstSampleTimestampUs());
+            timestampAdjusters.get(0).getFirstSampleTimestampUs(), waitForFirstSampleTimestamp);
         timestampAdjusters.add(timestampAdjuster);
       }
 
@@ -565,6 +597,10 @@ public final class TsExtractor implements Extractor {
           streamType = esInfo.streamType;
         }
         remainingEntriesLength -= esInfoLength + 5;
+
+        // Filter unwanted PIDs.
+        if( whiteListPIDs.size() > 0 && !whiteListPIDs.contains(elementaryPid) )
+          continue;
 
         int trackId = mode == MODE_HLS ? streamType : elementaryPid;
         if (trackIds.get(trackId)) {

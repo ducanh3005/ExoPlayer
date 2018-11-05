@@ -41,11 +41,22 @@ public final class TimestampAdjuster {
   // Volatile to allow isInitialized to be called on a different thread to adjustSampleTimestamp.
   private volatile long lastSampleTimestampUs;
 
+  private boolean waitForFirstSampleTimestamp;
+
+  public TimestampAdjuster(long firstSampleTimestampUs) {
+    this(firstSampleTimestampUs, false);
+  }
+
   /**
    * @param firstSampleTimestampUs See {@link #setFirstSampleTimestampUs(long)}.
    */
-  public TimestampAdjuster(long firstSampleTimestampUs) {
-    lastSampleTimestampUs = C.TIME_UNSET;
+  public TimestampAdjuster(long firstSampleTimestampUs, boolean waitForFirstSampleTimestamp) {
+    this.lastSampleTimestampUs = C.TIME_UNSET;
+    this.waitForFirstSampleTimestamp = waitForFirstSampleTimestamp;
+
+    if(waitForFirstSampleTimestamp)
+      timestampOffsetUs = C.TIME_UNSET;
+
     setFirstSampleTimestampUs(firstSampleTimestampUs);
   }
 
@@ -139,9 +150,16 @@ public final class TimestampAdjuster {
     if (lastSampleTimestampUs != C.TIME_UNSET) {
       lastSampleTimestampUs = timeUs;
     } else {
-      if (firstSampleTimestampUs != DO_NOT_OFFSET) {
-        // Calculate the timestamp offset.
-        timestampOffsetUs = firstSampleTimestampUs - timeUs;
+      if(waitForFirstSampleTimestamp) {
+        if(timestampOffsetUs == C.TIME_UNSET && firstSampleTimestampUs != DO_NOT_OFFSET) {
+          // Calculate the timestamp offset.
+          timestampOffsetUs = firstSampleTimestampUs - timeUs;
+        }
+      } else {
+        if (firstSampleTimestampUs != DO_NOT_OFFSET) {
+          // Calculate the timestamp offset.
+          timestampOffsetUs = firstSampleTimestampUs - timeUs;
+        }
       }
       synchronized (this) {
         lastSampleTimestampUs = timeUs;

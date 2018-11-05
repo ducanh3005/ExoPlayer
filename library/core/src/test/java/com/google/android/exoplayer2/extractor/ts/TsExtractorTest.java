@@ -111,7 +111,7 @@ public final class TsExtractorTest {
   public void testCustomInitialSectionReader() throws Exception {
     CustomTsPayloadReaderFactory factory = new CustomTsPayloadReaderFactory(false, true);
     TsExtractor tsExtractor =
-        new TsExtractor(TsExtractor.MODE_MULTI_PMT, new TimestampAdjuster(0), factory);
+        new TsExtractor(TsExtractor.MODE_MULTI_PMT, new TimestampAdjuster(0), factory, false);
     FakeExtractorInput input =
         new FakeExtractorInput.Builder()
             .setData(TestUtil.getByteArray(RuntimeEnvironment.application, "ts/sample_with_sdt.ts"))

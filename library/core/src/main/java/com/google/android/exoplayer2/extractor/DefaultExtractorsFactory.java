@@ -82,8 +82,22 @@ public final class DefaultExtractorsFactory implements ExtractorsFactory {
   private @TsExtractor.Mode int tsMode;
   private @DefaultTsPayloadReaderFactory.Flags int tsFlags;
 
+  private boolean waitForFirstSampleTimestamp;
+
   public DefaultExtractorsFactory() {
     tsMode = TsExtractor.MODE_SINGLE_PMT;
+  }
+
+  /**
+   * If true, the TimestampAdjuster will wait for the first timestamp adjustment, and use the
+   * input as the "firstSampleTimestamp".
+   *
+   * @param wait
+   * @return
+   */
+  public synchronized DefaultExtractorsFactory waitForFirstSampleTimestamp(boolean wait) {
+    this.waitForFirstSampleTimestamp = wait;
+    return this;
   }
 
   /**
@@ -181,7 +195,7 @@ public final class DefaultExtractorsFactory implements ExtractorsFactory {
   /**
    * Sets the mode for {@link TsExtractor} instances created by the factory.
    *
-   * @see TsExtractor#TsExtractor(int, TimestampAdjuster, TsPayloadReader.Factory)
+   * @see TsExtractor#TsExtractor(int, TimestampAdjuster, TsPayloadReader.Factory, boolean)
    * @param mode The mode to use.
    * @return The factory, for convenience.
    */
@@ -194,7 +208,7 @@ public final class DefaultExtractorsFactory implements ExtractorsFactory {
    * Sets flags for {@link DefaultTsPayloadReaderFactory}s used by {@link TsExtractor} instances
    * created by the factory.
    *
-   * @see TsExtractor#TsExtractor(int)
+   * @see TsExtractor#TsExtractor(int, boolean)
    * @param flags The flags to use.
    * @return The factory, for convenience.
    */
@@ -224,7 +238,7 @@ public final class DefaultExtractorsFactory implements ExtractorsFactory {
                     ? AdtsExtractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING
                     : 0));
     extractors[5] = new Ac3Extractor();
-    extractors[6] = new TsExtractor(tsMode, tsFlags);
+    extractors[6] = new TsExtractor(tsMode, tsFlags, waitForFirstSampleTimestamp);
     extractors[7] = new FlvExtractor();
     extractors[8] = new OggExtractor();
     extractors[9] = new PsExtractor();
